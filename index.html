@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Daft Map Search — Pick Dublin districts on a map, build a daft.ie search</title>
+<meta name="description" content="Click Dublin districts on a map to build a multi-area daft.ie rental or sales search URL. Add price, beds, baths, lease, furnishing and facility filters, then open the results on daft.ie." />
+<meta name="keywords" content="daft.ie, Dublin rentals, property search, map search, multi-area search, Dublin apartments, rent Dublin" />
+<meta name="robots" content="index, follow" />
+<meta name="author" content="Marcelo Varge" />
+<link rel="canonical" href="https://daft.varge.link/" />
+
+<!-- Open Graph -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Daft Map Search — Pick Dublin districts on a map" />
+<meta property="og:description" content="Click Dublin districts on a map to build a multi-area daft.ie search URL with price, beds, baths and facility filters." />
+<meta property="og:url" content="https://daft.varge.link/" />
+<meta property="og:site_name" content="Daft Map Search" />
+<meta property="og:image" content="https://daft.varge.link/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Daft Map Search — Pick Dublin districts on a map" />
+<meta name="twitter:description" content="Click Dublin districts on a map to build a multi-area daft.ie search URL with filters." />
+<meta name="twitter:image" content="https://daft.varge.link/og-image.png" />
+
+<!-- Favicon: matches the in-app logo (folded map + pin) -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='40' y2='40' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%233b82f6'/%3E%3Cstop offset='1' stop-color='%231d4ed8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='40' height='40' rx='11' fill='url(%23g)'/%3E%3Cpath d='M8 12.5h24M8 20h24M8 27.5h24' stroke='white' stroke-opacity='0.28' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M16 8v24M25 8v24' stroke='white' stroke-opacity='0.28' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M22 10.5c-4.2 0-7.5 3.3-7.5 7.4 0 5.2 7.5 12.1 7.5 12.1s7.5-6.9 7.5-12.1c0-4.1-3.3-7.4-7.5-7.4z' fill='white'/%3E%3Ccircle cx='22' cy='17.9' r='2.9' fill='%231d4ed8'/%3E%3C/svg%3E" />
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f8fafc;
+    --panel:       #ffffff;
+    --panel-hover: #f1f5f9;
+    --border:      #e2e8f0;
+    --border-strong:#cbd5e1;
+    --text:        #0f172a;
+    --text-2:      #334155;
+    --muted:       #64748b;
+    --accent:      #2563eb;
+    --accent-hover:#1d4ed8;
+    --accent-soft: rgba(37, 99, 235, 0.08);
+    --success:     #059669;
+    --danger:      #dc2626;
+    --shadow-sm:   0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+    --shadow-md:   0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -1px rgba(15, 23, 42, 0.04);
+    --shadow-lg:   0 10px 15px -3px rgba(15, 23, 42, 0.06), 0 4px 6px -2px rgba(15, 23, 42, 0.04);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  #app { display: grid; grid-template-columns: 380px 1fr; height: 100vh; }
+
+  /* --- Sidebar --- */
+  #sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  #sidebar::-webkit-scrollbar { width: 8px; }
+  #sidebar::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+
+  header.top {
+    padding: 20px 22px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    position: sticky; top: 0;
+    z-index: 5;
+  }
+  header.top h1 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  header.top .logo {
+    display: inline-flex;
+    filter: drop-shadow(0 2px 4px rgba(37, 99, 235, 0.25));
+  }
+  header.top .logo svg { display: block; }
+  header.top .wordmark { color: var(--text); }
+  header.top .wm-accent { color: var(--accent); }
+  header.top .sub {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  main { padding: 4px 22px 22px; flex: 1; }
+
+  /* Section (accordion) */
+  .section {
+    border-bottom: 1px solid var(--border);
+  }
+  .section:last-of-type { border-bottom: none; }
+  .section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0;
+    cursor: pointer;
+    user-select: none;
+  }
+  .section-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-2);
+  }
+  .section-count {
+    display: inline-block;
+    margin-left: 6px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-weight: 500;
+    min-width: 20px;
+    text-align: center;
+  }
+  .section-count.zero { color: var(--muted); background: var(--panel-hover); }
+  .chev {
+    width: 14px; height: 14px;
+    color: var(--muted);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .section.open .chev { transform: rotate(180deg); }
+  .section-body { display: none; padding-bottom: 16px; }
+  .section.open .section-body { display: block; }
+
+  label.field-label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+  .field-group { margin-bottom: 12px; }
+  .field-group:last-child { margin-bottom: 0; }
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  input[type="text"], input[type="number"], input[type="date"], select {
+    width: 100%;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 13px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  select {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='none' stroke='%2364748b' stroke-width='1.5' d='M1 1l4 4 4-4'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+  }
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  input::placeholder { color: #94a3b8; }
+
+  /* Chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip {
+    font-family: inherit;
+    font-size: 12px;
+    padding: 5px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all 0.12s;
+    font-weight: 500;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip.on {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .chip.on:hover { background: var(--accent-hover); }
+
+  /* Selected areas list */
+  #selected {
+    list-style: none;
+    padding: 0; margin: 0 0 8px 0;
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--panel-hover);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  #selected::-webkit-scrollbar { width: 6px; }
+  #selected::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+  #selected li {
+    display: flex;
+    align-items: center;
+    padding: 7px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+  }
+  #selected li:last-child { border-bottom: none; }
+  #selected .name-wrap { flex: 1; }
+  #selected .idx {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-right: 8px;
+    min-width: 20px;
+    display: inline-block;
+  }
+  #selected .remove {
+    background: transparent; border: none; cursor: pointer;
+    color: var(--muted);
+    font-size: 16px; line-height: 1;
+    padding: 0 4px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+  }
+  #selected .remove:hover { color: var(--danger); background: rgba(220, 38, 38, 0.08); }
+  #selected .empty {
+    justify-content: center;
+    color: var(--muted);
+    font-style: italic;
+    padding: 14px;
+    border: none;
+  }
+
+  /* Small link buttons */
+  .link-row { display: flex; gap: 14px; padding: 2px 0; }
+  .link-btn {
+    background: none; border: none; padding: 0;
+    color: var(--muted);
+    font: inherit; font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .link-btn:hover { color: var(--accent); }
+
+  /* URL block */
+  .url-block {
+    margin-top: 6px;
+    padding: 16px 22px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    position: sticky; bottom: 0;
+    box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.04);
+  }
+  #url {
+    width: 100%;
+    min-height: 80px;
+    background: #0f172a;
+    color: #7dd3fc;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    resize: vertical;
+    word-break: break-all;
+  }
+  .cta-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  button.cta {
+    background: var(--accent);
+    color: white;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 9px 14px;
+    font: inherit; font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  button.cta:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  button.cta.ghost {
+    background: var(--panel);
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
+  button.cta.ghost:hover { background: var(--panel-hover); border-color: var(--muted); }
+  button.cta.copied {
+    background: var(--success); border-color: var(--success);
+  }
+  .disclaimer {
+    margin-top: 10px;
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: var(--muted);
+    text-align: center;
+  }
+  .disclaimer a { color: var(--muted); }
+
+  /* --- Map --- */
+  #map { height: 100vh; background: #e5e3df; }
+  .leaflet-container { font-family: "Inter", sans-serif; }
+
+  /* Voronoi cells */
+  .voronoi-cell {
+    transition: fill-opacity 0.18s ease, stroke-opacity 0.18s ease;
+    cursor: pointer;
+  }
+
+  /* Marker labels */
+  .area-label {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    color: var(--text-2);
+    font-family: "Inter", sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-shadow:
+      0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 5px #fff;
+  }
+  .area-label.selected {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 12px;
+  }
+  .area-label::before { content: none !important; }
+
+  .leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+  }
+  .leaflet-popup-content {
+    font-family: "Inter", sans-serif;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  /* Map corner overlay */
+  .map-badge {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    z-index: 500;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    border-radius: 8px;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .map-badge .n {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .map-badge .lbl {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+
+  @media (max-width: 900px) {
+    #app { grid-template-columns: 1fr; grid-template-rows: auto 60vh; }
+    #sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+    #map { height: 60vh; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <header class="top">
+      <h1>
+        <span class="logo" aria-hidden="true">
+          <svg viewBox="0 0 40 40" width="30" height="30" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="lg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#3b82f6"/>
+                <stop offset="1" stop-color="#1d4ed8"/>
+              </linearGradient>
+            </defs>
+            <rect width="40" height="40" rx="11" fill="url(#lg)"/>
+            <!-- folded-map street lines -->
+            <path d="M8 12.5h24M8 20h24M8 27.5h24" stroke="#fff" stroke-opacity="0.28" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M16 8v24M25 8v24" stroke="#fff" stroke-opacity="0.28" stroke-width="1.6" stroke-linecap="round"/>
+            <!-- pin -->
+            <path d="M22 10.5c-4.2 0-7.5 3.3-7.5 7.4 0 5.2 7.5 12.1 7.5 12.1s7.5-6.9 7.5-12.1c0-4.1-3.3-7.4-7.5-7.4z" fill="#fff"/>
+            <circle cx="22" cy="17.9" r="2.9" fill="#1d4ed8"/>
+          </svg>
+        </span>
+        <span class="wordmark">Daft<span class="wm-accent">Map</span></span>
+      </h1>
+      <div class="sub">Click Dublin districts on the map to build a multi-area <a href="https://www.daft.ie" target="_blank" rel="noopener">daft.ie</a> search. Add filters, then copy or open the URL.</div>
+    </header>
+
+    <main>
+      <!-- Districts -->
+      <section class="section open" data-section="areas">
+        <div class="section-head">
+          <div><span class="section-title">Districts</span><span class="section-count zero" id="count">0</span></div>
+          <svg class="chev" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l5 5 5-5"/></svg>
+        </div>
+        <div class="section-body">
+          <ul id="selected"><li class="empty">Click the map to add areas</li></ul>
+          <div class="link-row">
+            <button class="link-btn" id="clearBtn">Clear all</button>
+            <button class="link-btn" id="allBtn">Select all</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Price / Beds / Type -->
+      <section class="section open" data-section="basics">
+        <div class="section-head">
+          <div><span class="section-title">Price · Beds · Type</span></div>
+          <svg class="chev" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l5 5 5-5"/></svg>
+        </div>
+        <div class="section-body">
+          <div class="field-group row-2">
+            <div><label class="field-label">Price from (€)</label><input id="priceFrom" type="number" placeholder="any" step="50" /></div>
+            <div><label class="field-label">Price to (€)</label><input id="priceTo" type="number" placeholder="any" step="50" /></div>
+          </div>
+          <div class="field-group row-2">
+            <div><label class="field-label">Beds min</label><input id="bedsFrom" type="number" placeholder="any" min="0" max="10" /></div>
+            <div><label class="field-label">Beds max</label><input id="bedsTo" type="number" placeholder="any" min="0" max="10" /></div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Property type</label>
+            <div class="chips" id="propertyTypes">
+              <button class="chip" data-val="houses">House</button>
+              <button class="chip" data-val="apartments">Apartment</button>
+              <button class="chip" data-val="studio-apartments">Studio</button>
+              <button class="chip" data-val="detached-houses">Detached</button>
+              <button class="chip" data-val="semi-detached-houses">Semi-detached</button>
+              <button class="chip" data-val="terraced-houses">Terraced</button>
+              <button class="chip" data-val="townhouses">Townhouse</button>
+              <button class="chip" data-val="duplexes">Duplex</button>
+              <button class="chip" data-val="bungalows">Bungalow</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Baths / Lease / Furnishing -->
+      <section class="section" data-section="terms">
+        <div class="section-head">
+          <div><span class="section-title">Baths · Lease · Furnishing</span></div>
+          <svg class="chev" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l5 5 5-5"/></svg>
+        </div>
+        <div class="section-body">
+          <div class="field-group row-2">
+            <div><label class="field-label">Baths min</label><input id="bathsFrom" type="number" placeholder="any" min="0" max="10" /></div>
+            <div><label class="field-label">Baths max</label><input id="bathsTo" type="number" placeholder="any" min="0" max="10" /></div>
+          </div>
+          <div class="field-group row-2">
+            <div><label class="field-label">Lease min (mo.)</label><input id="leaseFrom" type="number" placeholder="any" min="1" max="60" /></div>
+            <div><label class="field-label">Lease max (mo.)</label><input id="leaseTo" type="number" placeholder="any" min="1" max="60" /></div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Furnishing</label>
+            <select id="furnishing">
+              <option value="">Any</option>
+              <option value="furnished">Furnished</option>
+              <option value="unfurnished">Unfurnished</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Facilities -->
+      <section class="section" data-section="facilities">
+        <div class="section-head">
+          <div><span class="section-title">Facilities</span><span class="section-count zero" id="facCount">0</span></div>
+          <svg class="chev" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l5 5 5-5"/></svg>
+        </div>
+        <div class="section-body">
+          <div class="chips" id="facilities">
+            <button class="chip" data-val="alarm">Alarm</button>
+            <button class="chip" data-val="cable-television">Cable</button>
+            <button class="chip" data-val="dishwasher">Dishwasher</button>
+            <button class="chip" data-val="garden-patio-balcony">Garden / Patio</button>
+            <button class="chip" data-val="central-heating">Heating</button>
+            <button class="chip" data-val="internet">Internet</button>
+            <button class="chip" data-val="microwave">Microwave</button>
+            <button class="chip" data-val="parking">Parking</button>
+            <button class="chip" data-val="pets-allowed">Pets</button>
+            <button class="chip" data-val="smoking">Smoking</button>
+            <button class="chip" data-val="serviced-property">Serviced</button>
+            <button class="chip" data-val="dryer">Tumble dryer</button>
+            <button class="chip" data-val="washing-machine">Washing machine</button>
+            <button class="chip" data-val="wheelchair-access">Wheelchair access</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Media / Keywords / Recency -->
+      <section class="section" data-section="more">
+        <div class="section-head">
+          <div><span class="section-title">Media · Keywords · Recency</span></div>
+          <svg class="chev" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l5 5 5-5"/></svg>
+        </div>
+        <div class="section-body">
+          <div class="field-group">
+            <label class="field-label">Media</label>
+            <div class="chips" id="mediaTypes">
+              <button class="chip" data-val="video">With video</button>
+              <button class="chip" data-val="virtual-tour">Virtual tours</button>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Keyword</label>
+            <input id="keywords" type="text" placeholder='e.g. "garage" or "period"' />
+          </div>
+          <div class="field-group row-2">
+            <div>
+              <label class="field-label">Available from</label>
+              <input id="availableFrom" type="date" />
+            </div>
+            <div>
+              <label class="field-label">Added in last</label>
+              <select id="addedInLast">
+                <option value="">Any time</option>
+                <option value="1">24 hours</option>
+                <option value="3">3 days</option>
+                <option value="7">7 days</option>
+                <option value="14">14 days</option>
+                <option value="30">30 days</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Sort by</label>
+            <select id="sort">
+              <option value="publishDateDesc" selected>Most recent</option>
+              <option value="priceAsc">Price · low to high</option>
+              <option value="priceDesc">Price · high to low</option>
+              <option value="publishDateAsc">Oldest first</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Section</label>
+            <select id="section">
+              <option value="property-for-rent" selected>Property for rent</option>
+              <option value="property-for-sale">Property for sale</option>
+              <option value="sharing">Sharing</option>
+              <option value="student-accommodation-for-rent">Student rent</option>
+            </select>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="url-block">
+      <label class="field-label" style="margin-bottom: 6px;">Generated URL</label>
+      <textarea id="url" readonly></textarea>
+      <div class="cta-row">
+        <button class="cta" id="copyBtn">Copy</button>
+        <button class="cta ghost" id="openBtn">Open →</button>
+      </div>
+      <p class="disclaimer">
+        Unofficial tool — not affiliated with or endorsed by daft.ie.
+        District boundaries are approximate. Built by
+        <a href="https://github.com/mvarge/daft-map-search" target="_blank" rel="noopener">Marcelo Varge</a>.
+      </p>
+    </div>
+  </aside>
+
+  <div id="map">
+    <div class="map-badge">
+      <span class="n" id="badgeN">0</span>
+      <span class="lbl">districts selected</span>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6.0.4/dist/d3-delaunay.min.js"></script>
+<script src="./locations.js?v=5"></script>
+<script>
+  const LOCATIONS = window.DUBLIN_LOCATIONS;
+  console.log(`[daft-map] ${LOCATIONS.length} districts loaded`);
+
+  const selected = new Set();
+  const propertyTypes = new Set();
+  const facilities = new Set();
+  const mediaTypes = new Set();
+  const markers = new Map();
+  const polygons = new Map();
+
+  // --- Map ---
+  const map = L.map("map", { zoomControl: true }).setView([53.34, -6.28], 11);
+
+  // CARTO Voyager — closest free match to Google Maps (coloured roads, green parks, clear labels)
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: "abcd",
+  }).addTo(map);
+
+  // --- Voronoi cells clipped to Dublin bbox ---
+  const BBOX = [-6.60, 53.15, -5.95, 53.70];
+  const points = LOCATIONS.map(l => [l.lng, l.lat]);
+  const delaunay = d3.Delaunay.from(points);
+  const voronoi = delaunay.voronoi(BBOX);
+
+  LOCATIONS.forEach((loc, i) => {
+    const cell = voronoi.cellPolygon(i);
+    if (!cell) return;
+    const latlngs = cell.map(([lng, lat]) => [lat, lng]);
+    const poly = L.polygon(latlngs, {
+      color: "#2563eb",
+      weight: 1,
+      opacity: 0,
+      fillColor: "#2563eb",
+      fillOpacity: 0,
+      className: "voronoi-cell",
+    }).addTo(map);
+    poly.on("mouseover", () => {
+      if (selected.has(loc.slug)) return;
+      poly.setStyle({ fillOpacity: 0.06, opacity: 0.35 });
+    });
+    poly.on("mouseout", () => {
+      if (selected.has(loc.slug)) return;
+      poly.setStyle({ fillOpacity: 0, opacity: 0 });
+    });
+    poly.on("click", ev => { L.DomEvent.stopPropagation(ev); toggle(loc.slug); });
+    polygons.set(loc.slug, poly);
+  });
+
+  // Markers on top of polygons
+  LOCATIONS.forEach(loc => {
+    const marker = L.circleMarker([loc.lat, loc.lng], {
+      radius: 5,
+      fillColor: "#334155",
+      color: "#fff",
+      weight: 1.5,
+      fillOpacity: 1,
+    }).addTo(map);
+    marker.bindTooltip(loc.name, {
+      permanent: true, direction: "right", offset: [8, 0], className: "area-label",
+    });
+    marker.on("click", ev => { L.DomEvent.stopPropagation(ev); toggle(loc.slug); });
+    markers.set(loc.slug, marker);
+  });
+
+  function haversine(a, b) {
+    const R = 6371;
+    const toRad = d => (d * Math.PI) / 180;
+    const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat), lat2 = toRad(b.lat);
+    const x = Math.sin(dLat/2)**2 + Math.sin(dLng/2)**2 * Math.cos(lat1) * Math.cos(lat2);
+    return 2 * R * Math.asin(Math.sqrt(x));
+  }
+  function nearest(latlng) {
+    let best = null, bestDist = Infinity;
+    for (const loc of LOCATIONS) {
+      const d = haversine(latlng, loc);
+      if (d < bestDist) { bestDist = d; best = loc; }
+    }
+    return { loc: best, distKm: bestDist };
+  }
+  map.on("click", e => {
+    const { loc, distKm } = nearest({ lat: e.latlng.lat, lng: e.latlng.lng });
+    if (!loc) return;
+    if (distKm > 5) {
+      L.popup().setLatLng(e.latlng)
+        .setContent(`Nearest is <b>${loc.name}</b> — ${distKm.toFixed(1)} km away.`).openOn(map);
+      return;
+    }
+    toggle(loc.slug);
+  });
+
+  // --- Toggles ---
+  function toggle(slug) { selected.has(slug) ? selected.delete(slug) : selected.add(slug); render(); }
+  function clearAll() { selected.clear(); render(); }
+  function addAll() { LOCATIONS.forEach(l => selected.add(l.slug)); render(); }
+
+  // Accordion
+  document.querySelectorAll(".section-head").forEach(head => {
+    head.addEventListener("click", () => head.parentElement.classList.toggle("open"));
+  });
+
+  // Chip groups
+  function bindChips(id, set) {
+    document.getElementById(id).addEventListener("click", e => {
+      const btn = e.target.closest(".chip");
+      if (!btn) return;
+      const v = btn.dataset.val;
+      set.has(v) ? set.delete(v) : set.add(v);
+      btn.classList.toggle("on", set.has(v));
+      render();
+    });
+  }
+  bindChips("propertyTypes", propertyTypes);
+  bindChips("facilities", facilities);
+  bindChips("mediaTypes", mediaTypes);
+
+  function updateCountBadge(id, n) {
+    const el = document.getElementById(id);
+    el.textContent = n;
+    el.classList.toggle("zero", n === 0);
+  }
+
+  function render() {
+    // Markers
+    markers.forEach((m, slug) => {
+      const on = selected.has(slug);
+      m.setStyle({
+        fillColor: on ? "#2563eb" : "#334155",
+        color: "#fff",
+        radius: on ? 7 : 5,
+        weight: on ? 2 : 1.5,
+        fillOpacity: 1,
+      });
+      const el = m.getTooltip()?.getElement();
+      if (el) el.classList.toggle("selected", on);
+    });
+
+    // Voronoi cells
+    polygons.forEach((p, slug) => {
+      const on = selected.has(slug);
+      p.setStyle({
+        fillColor: "#2563eb",
+        color: "#1d4ed8",
+        weight: on ? 1.5 : 1,
+        opacity: on ? 0.6 : 0,
+        fillOpacity: on ? 0.14 : 0,
+      });
+    });
+
+    // Selected list
+    const ul = document.getElementById("selected");
+    const n = selected.size;
+    updateCountBadge("count", n);
+    updateCountBadge("facCount", facilities.size);
+    document.getElementById("badgeN").textContent = n;
+
+    if (n === 0) {
+      ul.innerHTML = '<li class="empty">Click the map to add areas</li>';
+    } else {
+      let i = 1;
+      const rows = [];
+      for (const slug of selected) {
+        const loc = LOCATIONS.find(l => l.slug === slug);
+        if (!loc) continue;
+        rows.push(`<li>
+          <span class="name-wrap"><span class="idx">${String(i).padStart(2,"0")}</span>${loc.name}</span>
+          <button class="remove" data-slug="${slug}" title="Remove">×</button>
+        </li>`);
+        i++;
+      }
+      ul.innerHTML = rows.join("");
+      ul.querySelectorAll(".remove").forEach(b => b.addEventListener("click", () => toggle(b.dataset.slug)));
+    }
+
+    document.getElementById("url").value = buildUrl();
+  }
+
+  function buildUrl() {
+    const section = document.getElementById("section").value;
+    const priceFrom = document.getElementById("priceFrom").value;
+    const priceTo   = document.getElementById("priceTo").value;
+    const bedsFrom  = document.getElementById("bedsFrom").value;
+    const bedsTo    = document.getElementById("bedsTo").value;
+    const bathsFrom = document.getElementById("bathsFrom").value;
+    const bathsTo   = document.getElementById("bathsTo").value;
+    const leaseFrom = document.getElementById("leaseFrom").value;
+    const leaseTo   = document.getElementById("leaseTo").value;
+    const furnishing= document.getElementById("furnishing").value;
+    const keywords  = document.getElementById("keywords").value.trim();
+    const sort      = document.getElementById("sort").value;
+    const availFrom = document.getElementById("availableFrom").value;
+    const addedDays = document.getElementById("addedInLast").value;
+
+    const priceParam = section === "property-for-sale" ? "salePrice" : "rentalPrice";
+    const params = [];
+
+    for (const slug of selected)   params.push(`location=${encodeURIComponent(slug)}`);
+    for (const v of propertyTypes) params.push(`propertyType=${encodeURIComponent(v)}`);
+    for (const v of facilities)    params.push(`facilities=${encodeURIComponent(v)}`);
+    for (const v of mediaTypes)    params.push(`mediaTypes=${encodeURIComponent(v)}`);
+
+    params.push("adState=published");
+    if (priceFrom)  params.push(`${priceParam}_from=${priceFrom}`);
+    if (priceTo)    params.push(`${priceParam}_to=${priceTo}`);
+    if (bedsFrom)   params.push(`numBeds_from=${bedsFrom}`);
+    if (bedsTo)     params.push(`numBeds_to=${bedsTo}`);
+    if (bathsFrom)  params.push(`numBaths_from=${bathsFrom}`);
+    if (bathsTo)    params.push(`numBaths_to=${bathsTo}`);
+    if (leaseFrom)  params.push(`leaseLength_from=${leaseFrom}`);
+    if (leaseTo)    params.push(`leaseLength_to=${leaseTo}`);
+    if (furnishing) params.push(`furnishing=${encodeURIComponent(furnishing)}`);
+    // NOTE: the three params below are best-effort (from daft-scraper), not yet
+    // verified against live daft.ie URLs like the price/beds/baths/lease ones.
+    if (keywords)   params.push(`terms=${encodeURIComponent(keywords)}`);
+    if (availFrom)  params.push(`availableFrom_from=${availFrom}`);
+    if (addedDays) {
+      const d = new Date(); d.setDate(d.getDate() - Number(addedDays));
+      params.push(`firstPublishDate_from=${d.toISOString().slice(0, 10)}`);
+    }
+    if (sort)       params.push(`sort=${sort}`);
+
+    return `https://www.daft.ie/${section}/ireland?${params.join("&")}`;
+  }
+
+  // Wire filter inputs
+  ["priceFrom","priceTo","bedsFrom","bedsTo","bathsFrom","bathsTo",
+   "leaseFrom","leaseTo","furnishing","keywords","availableFrom",
+   "addedInLast","sort","section"].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener("input", render);
+    el.addEventListener("change", render);
+  });
+
+  // Buttons
+  document.getElementById("clearBtn").addEventListener("click", clearAll);
+  document.getElementById("allBtn").addEventListener("click", addAll);
+  document.getElementById("copyBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("copyBtn");
+    try {
+      await navigator.clipboard.writeText(document.getElementById("url").value);
+      const orig = btn.textContent;
+      btn.textContent = "Copied";
+      btn.classList.add("copied");
+      setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 1200);
+    } catch (err) { alert("Copy failed: " + err.message); }
+  });
+  document.getElementById("openBtn").addEventListener("click", () => {
+    if (selected.size === 0) { alert("Add at least one district first."); return; }
+    window.open(document.getElementById("url").value, "_blank", "noopener");
+  });
+
+  render();
+</script>
+</body>
+</html>
