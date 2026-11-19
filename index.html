@@ -604,6 +604,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6.0.4/dist/d3-delaunay.min.js"></script>
 <script src="./locations.js?v=5"></script>
+<script src="./config.js"></script>
 <script>
   const LOCATIONS = window.DUBLIN_LOCATIONS;
   console.log(`[daft-map] ${LOCATIONS.length} districts loaded`);
@@ -618,11 +619,15 @@
   // --- Map ---
   const map = L.map("map", { zoomControl: true }).setView([53.34, -6.28], 11);
 
-  // CARTO Voyager — closest free match to Google Maps (coloured roads, green parks, clear labels)
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+  // CARTO now requires a browser-visible key. Local development can use OSM.
+  const cartoKey = window.DAFT_CONFIG?.cartoApiKey;
+  const tileUrl = cartoKey
+    ? `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${encodeURIComponent(cartoKey)}`
+    : "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+  L.tileLayer(tileUrl, {
     maxZoom: 19,
-    attribution: '&copy; <a href="https://openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: "abcd",
+    attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+      + (cartoKey ? ' &copy; <a href="https://carto.com/attributions">CARTO</a>' : ''),
   }).addTo(map);
 
   // --- Voronoi cells clipped to Dublin bbox ---
