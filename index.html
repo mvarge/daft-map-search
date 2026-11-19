@@ -8,15 +8,15 @@
 <meta name="keywords" content="daft.ie, Dublin rentals, property search, map search, multi-area search, Dublin apartments, rent Dublin" />
 <meta name="robots" content="index, follow" />
 <meta name="author" content="Marcelo Varge" />
-<link rel="canonical" href="https://daft.varge.link/" />
+<link rel="canonical" href="https://daft.mvarge.com/" />
 
 <!-- Open Graph -->
 <meta property="og:type" content="website" />
 <meta property="og:title" content="Daft Map Search — Pick Dublin districts on a map" />
 <meta property="og:description" content="Click Dublin districts on a map to build a multi-area daft.ie search URL with price, beds, baths and facility filters." />
-<meta property="og:url" content="https://daft.varge.link/" />
+<meta property="og:url" content="https://daft.mvarge.com/" />
 <meta property="og:site_name" content="Daft Map Search" />
-<meta property="og:image" content="https://daft.varge.link/og-image.png" />
+<meta property="og:image" content="https://daft.mvarge.com/og-image.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 
@@ -24,7 +24,7 @@
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Daft Map Search — Pick Dublin districts on a map" />
 <meta name="twitter:description" content="Click Dublin districts on a map to build a multi-area daft.ie search URL with filters." />
-<meta name="twitter:image" content="https://daft.varge.link/og-image.png" />
+<meta name="twitter:image" content="https://daft.mvarge.com/og-image.png" />
 
 <!-- Favicon: matches the in-app logo (folded map + pin) -->
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='40' y2='40' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%233b82f6'/%3E%3Cstop offset='1' stop-color='%231d4ed8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='40' height='40' rx='11' fill='url(%23g)'/%3E%3Cpath d='M8 12.5h24M8 20h24M8 27.5h24' stroke='white' stroke-opacity='0.28' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M16 8v24M25 8v24' stroke='white' stroke-opacity='0.28' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M22 10.5c-4.2 0-7.5 3.3-7.5 7.4 0 5.2 7.5 12.1 7.5 12.1s7.5-6.9 7.5-12.1c0-4.1-3.3-7.4-7.5-7.4z' fill='white'/%3E%3Ccircle cx='22' cy='17.9' r='2.9' fill='%231d4ed8'/%3E%3C/svg%3E" />
@@ -588,7 +588,7 @@
       <p class="disclaimer">
         Unofficial tool — not affiliated with or endorsed by daft.ie.
         District boundaries are approximate. Built by
-        <a href="https://github.com/mvarge/daft-map-search" target="_blank" rel="noopener">Marcelo Varge</a>.
+        <a href="https://mvarge.com" target="_blank" rel="noopener">Marcelo Varge</a>.
       </p>
     </div>
   </aside>
@@ -803,7 +803,13 @@
     const priceParam = section === "property-for-sale" ? "salePrice" : "rentalPrice";
     const params = [];
 
-    for (const slug of selected)   params.push(`location=${encodeURIComponent(slug)}`);
+    // Daft resolves a single location from the path, not the query string.
+    // Selecting every district uses the county path to avoid an oversized search.
+    const location = selected.size === LOCATIONS.length ? "dublin"
+      : selected.size === 1 ? [...selected][0] : "ireland";
+    if (selected.size > 1 && selected.size < LOCATIONS.length) {
+      for (const slug of selected) params.push(`location=${encodeURIComponent(slug)}`);
+    }
     for (const v of propertyTypes) params.push(`propertyType=${encodeURIComponent(v)}`);
     for (const v of facilities)    params.push(`facilities=${encodeURIComponent(v)}`);
     for (const v of mediaTypes)    params.push(`mediaTypes=${encodeURIComponent(v)}`);
@@ -828,7 +834,7 @@
     }
     if (sort)       params.push(`sort=${sort}`);
 
-    return `https://www.daft.ie/${section}/ireland?${params.join("&")}`;
+    return `https://www.daft.ie/${section}/${location}?${params.join("&")}`;
   }
 
   // Wire filter inputs
