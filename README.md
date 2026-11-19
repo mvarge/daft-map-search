@@ -24,6 +24,10 @@ python3 -m http.server 5173
 
 ## Deploy
 
+The canonical URL is https://daft.mvarge.com. This app has its own Vercel
+project, connected to this repository. Cloudflare has a DNS-only CNAME for
+`daft` pointing to the project-specific target shown in Vercel's domain settings.
+
 Pure static site. On Vercel:
 
 ```bash
@@ -42,3 +46,6 @@ or link the repo in the Vercel dashboard — no build command needed.
 - Daft URL parameters (`rentalPrice_*`, `numBeds_*`, `numBaths_*`,
   `leaseLength_*`, `furnishing`, etc.) validated against live daft.ie search
   URLs.
+- A single selected district goes in the URL path. Multiple districts use
+  repeated `location` query parameters. Selecting all districts uses the Dublin
+  county path to avoid an oversized search URL.
